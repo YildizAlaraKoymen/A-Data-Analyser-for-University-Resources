@@ -1,0 +1,1366 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "zh3Qjh8mRHqD"
+      },
+      "source": [
+        "# Assignment 2: N-grams and Language Identification\n",
+        "## CNG463 - Introduction to Natural Language Processing\n",
+        "### METU NCC Computer Engineering | Fall 2025-26\n",
+        "\n",
+        "**Student Name:**  \n",
+        "**Student ID:**  \n",
+        "**Due Date:** 16 November 2025 (Sunday) before midnight\n",
+        "\n",
+        "---"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "CyDEnwcxRHqE"
+      },
+      "source": [
+        "## Overview\n",
+        "\n",
+        "This assignment focuses on:\n",
+        "1. Building **character-based** 2-gram and 3-gram language models with Laplace smoothing\n",
+        "2. Sentence-based language identification using 10-fold cross-validation\n",
+        "3. Evaluation using accuracy, precision, recall, and F1-score\n",
+        "4. Comparison and analysis\n",
+        "\n",
+        "**Note:** For language identification, we use **character n-grams** rather than word n-grams because they better capture language-specific patterns like letter combinations, diacritics, and writing systems.\n",
+        "\n",
+        "**Grading:**\n",
+        "- Written Questions (7 × 4 pts): **28 pts**\n",
+        "- Code Tasks with TODO (11 total): **72 pts** distributed by effort level:\n",
+        "  - Simple tasks: 4 pts each (2 cells)\n",
+        "  - Moderate tasks: 6 pts each (4 cells)\n",
+        "  - Complex tasks: 8 pts each (5 cells)\n",
+        "- **Total: 100 pts**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "srF42PZXRHqP"
+      },
+      "source": [
+        "---\n",
+        "\n",
+        "## Pre-Submission Checklist\n",
+        "\n",
+        "- [ ] Name and student ID at top\n",
+        "- [ ] No cells are added or removed\n",
+        "- [ ] All TODO sections completed\n",
+        "- [ ] All questions answered\n",
+        "- [ ] Code runs without errors\n",
+        "- [ ] Results tables included\n",
+        "- [ ] Run All before saving"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Jq0Xw3YQRHqE"
+      },
+      "source": [
+        "## Setup and Imports"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "gwyLNfKaRHqE"
+      },
+      "outputs": [],
+      "source": [
+        "# Standard libraries\n",
+        "import numpy as np\n",
+        "import pandas as pd\n",
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
+        "from collections import defaultdict, Counter\n",
+        "from typing import List, Tuple, Dict\n",
+        "import re\n",
+        "\n",
+        "# Scikit-learn for cross-validation and metrics\n",
+        "from sklearn.model_selection import KFold\n",
+        "from sklearn.metrics import accuracy_score, precision_recall_fscore_support\n",
+        "from scipy.stats import ttest_rel\n",
+        "\n",
+        "\n",
+        "# Set random seed for reproducibility\n",
+        "np.random.seed(42)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Mr-UNnAGRHqF"
+      },
+      "source": [
+        "---\n",
+        "\n",
+        "# Task 1: Corpus Preparation and Statistics (22 points)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "U5k13c4MRHqF"
+      },
+      "source": [
+        "## 1.1: Upload Corpus Files\n",
+        "\n",
+        "Prepare your text files in **two different languages** (accepted formats: `.txt`, `.pdf`, or `.docx`). When you run the cell below, you'll be prompted to upload files for each language separately. Make sure your files contain substantial text (reports, essays, or similar content from other courses). Each language requires at least **5000** words in its corpus."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "id": "cb6tjNLmRHqF",
+        "outputId": "03080957-e003-4736-b33e-a30d6727fec2",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 181
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Upload your ENGLISH corpus file(s):\n"
+          ]
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "<IPython.core.display.HTML object>"
+            ],
+            "text/html": [
+              "\n",
+              "     <input type=\"file\" id=\"files-13b012b3-ea01-4f82-915f-114484f944ae\" name=\"files[]\" multiple disabled\n",
+              "        style=\"border:none\" />\n",
+              "     <output id=\"result-13b012b3-ea01-4f82-915f-114484f944ae\">\n",
+              "      Upload widget is only available when the cell has been executed in the\n",
+              "      current browser session. Please rerun this cell to enable.\n",
+              "      </output>\n",
+              "      <script>// Copyright 2017 Google LLC\n",
+              "//\n",
+              "// Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+              "// you may not use this file except in compliance with the License.\n",
+              "// You may obtain a copy of the License at\n",
+              "//\n",
+              "//      http://www.apache.org/licenses/LICENSE-2.0\n",
+              "//\n",
+              "// Unless required by applicable law or agreed to in writing, software\n",
+              "// distributed under the License is distributed on an \"AS IS\" BASIS,\n",
+              "// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n",
+              "// See the License for the specific language governing permissions and\n",
+              "// limitations under the License.\n",
+              "\n",
+              "/**\n",
+              " * @fileoverview Helpers for google.colab Python module.\n",
+              " */\n",
+              "(function(scope) {\n",
+              "function span(text, styleAttributes = {}) {\n",
+              "  const element = document.createElement('span');\n",
+              "  element.textContent = text;\n",
+              "  for (const key of Object.keys(styleAttributes)) {\n",
+              "    element.style[key] = styleAttributes[key];\n",
+              "  }\n",
+              "  return element;\n",
+              "}\n",
+              "\n",
+              "// Max number of bytes which will be uploaded at a time.\n",
+              "const MAX_PAYLOAD_SIZE = 100 * 1024;\n",
+              "\n",
+              "function _uploadFiles(inputId, outputId) {\n",
+              "  const steps = uploadFilesStep(inputId, outputId);\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  // Cache steps on the outputElement to make it available for the next call\n",
+              "  // to uploadFilesContinue from Python.\n",
+              "  outputElement.steps = steps;\n",
+              "\n",
+              "  return _uploadFilesContinue(outputId);\n",
+              "}\n",
+              "\n",
+              "// This is roughly an async generator (not supported in the browser yet),\n",
+              "// where there are multiple asynchronous steps and the Python side is going\n",
+              "// to poll for completion of each step.\n",
+              "// This uses a Promise to block the python side on completion of each step,\n",
+              "// then passes the result of the previous step as the input to the next step.\n",
+              "function _uploadFilesContinue(outputId) {\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  const steps = outputElement.steps;\n",
+              "\n",
+              "  const next = steps.next(outputElement.lastPromiseValue);\n",
+              "  return Promise.resolve(next.value.promise).then((value) => {\n",
+              "    // Cache the last promise value to make it available to the next\n",
+              "    // step of the generator.\n",
+              "    outputElement.lastPromiseValue = value;\n",
+              "    return next.value.response;\n",
+              "  });\n",
+              "}\n",
+              "\n",
+              "/**\n",
+              " * Generator function which is called between each async step of the upload\n",
+              " * process.\n",
+              " * @param {string} inputId Element ID of the input file picker element.\n",
+              " * @param {string} outputId Element ID of the output display.\n",
+              " * @return {!Iterable<!Object>} Iterable of next steps.\n",
+              " */\n",
+              "function* uploadFilesStep(inputId, outputId) {\n",
+              "  const inputElement = document.getElementById(inputId);\n",
+              "  inputElement.disabled = false;\n",
+              "\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  outputElement.innerHTML = '';\n",
+              "\n",
+              "  const pickedPromise = new Promise((resolve) => {\n",
+              "    inputElement.addEventListener('change', (e) => {\n",
+              "      resolve(e.target.files);\n",
+              "    });\n",
+              "  });\n",
+              "\n",
+              "  const cancel = document.createElement('button');\n",
+              "  inputElement.parentElement.appendChild(cancel);\n",
+              "  cancel.textContent = 'Cancel upload';\n",
+              "  const cancelPromise = new Promise((resolve) => {\n",
+              "    cancel.onclick = () => {\n",
+              "      resolve(null);\n",
+              "    };\n",
+              "  });\n",
+              "\n",
+              "  // Wait for the user to pick the files.\n",
+              "  const files = yield {\n",
+              "    promise: Promise.race([pickedPromise, cancelPromise]),\n",
+              "    response: {\n",
+              "      action: 'starting',\n",
+              "    }\n",
+              "  };\n",
+              "\n",
+              "  cancel.remove();\n",
+              "\n",
+              "  // Disable the input element since further picks are not allowed.\n",
+              "  inputElement.disabled = true;\n",
+              "\n",
+              "  if (!files) {\n",
+              "    return {\n",
+              "      response: {\n",
+              "        action: 'complete',\n",
+              "      }\n",
+              "    };\n",
+              "  }\n",
+              "\n",
+              "  for (const file of files) {\n",
+              "    const li = document.createElement('li');\n",
+              "    li.append(span(file.name, {fontWeight: 'bold'}));\n",
+              "    li.append(span(\n",
+              "        `(${file.type || 'n/a'}) - ${file.size} bytes, ` +\n",
+              "        `last modified: ${\n",
+              "            file.lastModifiedDate ? file.lastModifiedDate.toLocaleDateString() :\n",
+              "                                    'n/a'} - `));\n",
+              "    const percent = span('0% done');\n",
+              "    li.appendChild(percent);\n",
+              "\n",
+              "    outputElement.appendChild(li);\n",
+              "\n",
+              "    const fileDataPromise = new Promise((resolve) => {\n",
+              "      const reader = new FileReader();\n",
+              "      reader.onload = (e) => {\n",
+              "        resolve(e.target.result);\n",
+              "      };\n",
+              "      reader.readAsArrayBuffer(file);\n",
+              "    });\n",
+              "    // Wait for the data to be ready.\n",
+              "    let fileData = yield {\n",
+              "      promise: fileDataPromise,\n",
+              "      response: {\n",
+              "        action: 'continue',\n",
+              "      }\n",
+              "    };\n",
+              "\n",
+              "    // Use a chunked sending to avoid message size limits. See b/62115660.\n",
+              "    let position = 0;\n",
+              "    do {\n",
+              "      const length = Math.min(fileData.byteLength - position, MAX_PAYLOAD_SIZE);\n",
+              "      const chunk = new Uint8Array(fileData, position, length);\n",
+              "      position += length;\n",
+              "\n",
+              "      const base64 = btoa(String.fromCharCode.apply(null, chunk));\n",
+              "      yield {\n",
+              "        response: {\n",
+              "          action: 'append',\n",
+              "          file: file.name,\n",
+              "          data: base64,\n",
+              "        },\n",
+              "      };\n",
+              "\n",
+              "      let percentDone = fileData.byteLength === 0 ?\n",
+              "          100 :\n",
+              "          Math.round((position / fileData.byteLength) * 100);\n",
+              "      percent.textContent = `${percentDone}% done`;\n",
+              "\n",
+              "    } while (position < fileData.byteLength);\n",
+              "  }\n",
+              "\n",
+              "  // All done.\n",
+              "  yield {\n",
+              "    response: {\n",
+              "      action: 'complete',\n",
+              "    }\n",
+              "  };\n",
+              "}\n",
+              "\n",
+              "scope.google = scope.google || {};\n",
+              "scope.google.colab = scope.google.colab || {};\n",
+              "scope.google.colab._files = {\n",
+              "  _uploadFiles,\n",
+              "  _uploadFilesContinue,\n",
+              "};\n",
+              "})(self);\n",
+              "</script> "
+            ]
+          },
+          "metadata": {}
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Saving TheLittlePrince.pdf to TheLittlePrince.pdf\n",
+            "\n",
+            "Upload your SECOND LANGUAGE corpus file(s):\n"
+          ]
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "<IPython.core.display.HTML object>"
+            ],
+            "text/html": [
+              "\n",
+              "     <input type=\"file\" id=\"files-5c3096d4-1372-4d0a-9188-c359fb63ee5f\" name=\"files[]\" multiple disabled\n",
+              "        style=\"border:none\" />\n",
+              "     <output id=\"result-5c3096d4-1372-4d0a-9188-c359fb63ee5f\">\n",
+              "      Upload widget is only available when the cell has been executed in the\n",
+              "      current browser session. Please rerun this cell to enable.\n",
+              "      </output>\n",
+              "      <script>// Copyright 2017 Google LLC\n",
+              "//\n",
+              "// Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+              "// you may not use this file except in compliance with the License.\n",
+              "// You may obtain a copy of the License at\n",
+              "//\n",
+              "//      http://www.apache.org/licenses/LICENSE-2.0\n",
+              "//\n",
+              "// Unless required by applicable law or agreed to in writing, software\n",
+              "// distributed under the License is distributed on an \"AS IS\" BASIS,\n",
+              "// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n",
+              "// See the License for the specific language governing permissions and\n",
+              "// limitations under the License.\n",
+              "\n",
+              "/**\n",
+              " * @fileoverview Helpers for google.colab Python module.\n",
+              " */\n",
+              "(function(scope) {\n",
+              "function span(text, styleAttributes = {}) {\n",
+              "  const element = document.createElement('span');\n",
+              "  element.textContent = text;\n",
+              "  for (const key of Object.keys(styleAttributes)) {\n",
+              "    element.style[key] = styleAttributes[key];\n",
+              "  }\n",
+              "  return element;\n",
+              "}\n",
+              "\n",
+              "// Max number of bytes which will be uploaded at a time.\n",
+              "const MAX_PAYLOAD_SIZE = 100 * 1024;\n",
+              "\n",
+              "function _uploadFiles(inputId, outputId) {\n",
+              "  const steps = uploadFilesStep(inputId, outputId);\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  // Cache steps on the outputElement to make it available for the next call\n",
+              "  // to uploadFilesContinue from Python.\n",
+              "  outputElement.steps = steps;\n",
+              "\n",
+              "  return _uploadFilesContinue(outputId);\n",
+              "}\n",
+              "\n",
+              "// This is roughly an async generator (not supported in the browser yet),\n",
+              "// where there are multiple asynchronous steps and the Python side is going\n",
+              "// to poll for completion of each step.\n",
+              "// This uses a Promise to block the python side on completion of each step,\n",
+              "// then passes the result of the previous step as the input to the next step.\n",
+              "function _uploadFilesContinue(outputId) {\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  const steps = outputElement.steps;\n",
+              "\n",
+              "  const next = steps.next(outputElement.lastPromiseValue);\n",
+              "  return Promise.resolve(next.value.promise).then((value) => {\n",
+              "    // Cache the last promise value to make it available to the next\n",
+              "    // step of the generator.\n",
+              "    outputElement.lastPromiseValue = value;\n",
+              "    return next.value.response;\n",
+              "  });\n",
+              "}\n",
+              "\n",
+              "/**\n",
+              " * Generator function which is called between each async step of the upload\n",
+              " * process.\n",
+              " * @param {string} inputId Element ID of the input file picker element.\n",
+              " * @param {string} outputId Element ID of the output display.\n",
+              " * @return {!Iterable<!Object>} Iterable of next steps.\n",
+              " */\n",
+              "function* uploadFilesStep(inputId, outputId) {\n",
+              "  const inputElement = document.getElementById(inputId);\n",
+              "  inputElement.disabled = false;\n",
+              "\n",
+              "  const outputElement = document.getElementById(outputId);\n",
+              "  outputElement.innerHTML = '';\n",
+              "\n",
+              "  const pickedPromise = new Promise((resolve) => {\n",
+              "    inputElement.addEventListener('change', (e) => {\n",
+              "      resolve(e.target.files);\n",
+              "    });\n",
+              "  });\n",
+              "\n",
+              "  const cancel = document.createElement('button');\n",
+              "  inputElement.parentElement.appendChild(cancel);\n",
+              "  cancel.textContent = 'Cancel upload';\n",
+              "  const cancelPromise = new Promise((resolve) => {\n",
+              "    cancel.onclick = () => {\n",
+              "      resolve(null);\n",
+              "    };\n",
+              "  });\n",
+              "\n",
+              "  // Wait for the user to pick the files.\n",
+              "  const files = yield {\n",
+              "    promise: Promise.race([pickedPromise, cancelPromise]),\n",
+              "    response: {\n",
+              "      action: 'starting',\n",
+              "    }\n",
+              "  };\n",
+              "\n",
+              "  cancel.remove();\n",
+              "\n",
+              "  // Disable the input element since further picks are not allowed.\n",
+              "  inputElement.disabled = true;\n",
+              "\n",
+              "  if (!files) {\n",
+              "    return {\n",
+              "      response: {\n",
+              "        action: 'complete',\n",
+              "      }\n",
+              "    };\n",
+              "  }\n",
+              "\n",
+              "  for (const file of files) {\n",
+              "    const li = document.createElement('li');\n",
+              "    li.append(span(file.name, {fontWeight: 'bold'}));\n",
+              "    li.append(span(\n",
+              "        `(${file.type || 'n/a'}) - ${file.size} bytes, ` +\n",
+              "        `last modified: ${\n",
+              "            file.lastModifiedDate ? file.lastModifiedDate.toLocaleDateString() :\n",
+              "                                    'n/a'} - `));\n",
+              "    const percent = span('0% done');\n",
+              "    li.appendChild(percent);\n",
+              "\n",
+              "    outputElement.appendChild(li);\n",
+              "\n",
+              "    const fileDataPromise = new Promise((resolve) => {\n",
+              "      const reader = new FileReader();\n",
+              "      reader.onload = (e) => {\n",
+              "        resolve(e.target.result);\n",
+              "      };\n",
+              "      reader.readAsArrayBuffer(file);\n",
+              "    });\n",
+              "    // Wait for the data to be ready.\n",
+              "    let fileData = yield {\n",
+              "      promise: fileDataPromise,\n",
+              "      response: {\n",
+              "        action: 'continue',\n",
+              "      }\n",
+              "    };\n",
+              "\n",
+              "    // Use a chunked sending to avoid message size limits. See b/62115660.\n",
+              "    let position = 0;\n",
+              "    do {\n",
+              "      const length = Math.min(fileData.byteLength - position, MAX_PAYLOAD_SIZE);\n",
+              "      const chunk = new Uint8Array(fileData, position, length);\n",
+              "      position += length;\n",
+              "\n",
+              "      const base64 = btoa(String.fromCharCode.apply(null, chunk));\n",
+              "      yield {\n",
+              "        response: {\n",
+              "          action: 'append',\n",
+              "          file: file.name,\n",
+              "          data: base64,\n",
+              "        },\n",
+              "      };\n",
+              "\n",
+              "      let percentDone = fileData.byteLength === 0 ?\n",
+              "          100 :\n",
+              "          Math.round((position / fileData.byteLength) * 100);\n",
+              "      percent.textContent = `${percentDone}% done`;\n",
+              "\n",
+              "    } while (position < fileData.byteLength);\n",
+              "  }\n",
+              "\n",
+              "  // All done.\n",
+              "  yield {\n",
+              "    response: {\n",
+              "      action: 'complete',\n",
+              "    }\n",
+              "  };\n",
+              "}\n",
+              "\n",
+              "scope.google = scope.google || {};\n",
+              "scope.google.colab = scope.google.colab || {};\n",
+              "scope.google.colab._files = {\n",
+              "  _uploadFiles,\n",
+              "  _uploadFilesContinue,\n",
+              "};\n",
+              "})(self);\n",
+              "</script> "
+            ]
+          },
+          "metadata": {}
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Saving KucukPrens.pdf to KucukPrens.pdf\n"
+          ]
+        }
+      ],
+      "source": [
+        "from google.colab import files\n",
+        "\n",
+        "print(\"Upload your ENGLISH corpus file(s):\")\n",
+        "english_files = files.upload()\n",
+        "\n",
+        "print(\"\\nUpload your SECOND LANGUAGE corpus file(s):\")\n",
+        "second_lang_files = files.upload()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "UwDDP9gORHqF"
+      },
+      "source": [
+        "## 1.2: Load and Preprocess Data (12 points)\n",
+        "\n",
+        "Load your uploaded files, extract text, preprocess, split into sentences, and tokenize. You'll need helper functions to handle different file formats.\n",
+        "\n",
+        "**Steps:**\n",
+        "1. Read files based on format (`.txt`, `.pdf`, `.docx`) and combine them into single text for each language\n",
+        "2. Apply preprocessing (e.g., lowercasing, handling punctuation)\n",
+        "3. Split each corpus into individual sentences\n",
+        "4. Tokenize each sentence into words (for statistics)\n",
+        "5. Store the results as two lists of tokenized sentences\n",
+        "\n",
+        "**Important:** You'll use word tokenization for calculating statistics, but for the n-gram models in Task 2, you'll work with character n-grams directly on the sentence strings."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "FI_9lAXTRHqF"
+      },
+      "outputs": [],
+      "source": [
+        "import re\n",
+        "from typing import List\n",
+        "\n",
+        "def read_txt_file(filename: str) -> str:\n",
+        "    \"\"\"Read a .txt file and return its content.\"\"\"\n",
+        "    with open(filename, 'r', encoding='utf-8') as f:\n",
+        "        return f.read()\n",
+        "\n",
+        "def read_pdf_file(filename: str) -> str:\n",
+        "    \"\"\"Read a .pdf file and return its text content.\"\"\"\n",
+        "    !pip install PyPDF2\n",
+        "    import PyPDF2\n",
+        "\n",
+        "    with open(filename, \"rb\") as pdf_file:\n",
+        "      f = PyPDF2.read(pdf_file)\n",
+        "      text = []\n",
+        "      for page in f.pages:\n",
+        "        page_text = page.extract_text()\n",
+        "        if page_text:\n",
+        "          text.append(page_text)\n",
+        "\n",
+        "    return \"\".join(text)\n",
+        "\n",
+        "def read_docx_file(filename: str) -> str:\n",
+        "    \"\"\"Read a .docx file and return its text content.\"\"\"\n",
+        "    !pip install python-docx\n",
+        "    import python-docx\n",
+        "\n",
+        "    doc = docx.Document(filename)\n",
+        "\n",
+        "    text = []\n",
+        "    for paragraph in doc.paragraph:\n",
+        "      text.append(text)\n",
+        "\n",
+        "    return \"\".join(text)\n",
+        "\n",
+        "def split_into_sentences(text: str) -> List[str]:\n",
+        "    \"\"\"Split text into sentences.\"\"\"\n",
+        "    !pip install nltk.sent_tokenize\n",
+        "\n",
+        "    import nltk.sent_tokenize\n",
+        "    return nltk.sent_tokenize(text)\n",
+        "\n",
+        "def tokenize_sentence(sentence: str) -> List[str]:\n",
+        "    \"\"\"Tokenize a sentence into words.\"\"\"\n",
+        "    # TODO: Implement word tokenization\n",
+        "    # You can use str.split() or nltk.word_tokenize\n",
+        "    !pip install nltk.word_tokenize\n",
+        "\n",
+        "    import nltk.word_tokenize\n",
+        "    return nltk.word_tokenize(sentence)\n",
+        "\n",
+        "# TODO:\n",
+        "#\n",
+        "# 1. Read and combine files for each language\n",
+        "#    - Loop through lang1_files and lang2_files\n",
+        "#    - Use appropriate read function based on file extension\n",
+        "#    - Combine all text into lang1_text and lang2_text\n",
+        "#\n",
+        "# 2. Apply preprocessing to both lang1_text and lang2_text\n",
+        "#    (e.g., lowercasing, removing extra whitespace)\n",
+        "#\n",
+        "# 3. Split each corpus into sentences using split_into_sentences()\n",
+        "#\n",
+        "# 4. Tokenize each sentence using tokenize_sentence()\n",
+        "#\n",
+        "# Note: These tokenized sentences will be used for statistics in Task 1.\n",
+        "# In Task 2, you'll work with the raw sentence strings for character n-grams.\n",
+        "\n",
+        "def combine_files(fileList: List[str]):\n",
+        "  text = []\n",
+        "  for filename in fileList:\n",
+        "    fname = filename.lower()\n",
+        "    if fname.endswith(\".txt\"):\n",
+        "      text.append(read_txt_file(filename))\n",
+        "    elif fname.endswith(\".pdf\"):\n",
+        "      text.append(read_pdf_file(filename))\n",
+        "    elif fname.endswith(\".docx\"):\n",
+        "      text.append(read_docx_file(filename))\n",
+        "    else:\n",
+        "      raise ValueError(f\"Unsupported file format: {filename}\")\n",
+        "\n",
+        "  return \" \".join(text)\n",
+        "\n",
+        "#\n",
+        "\n",
+        "# At the end, you should have:\n",
+        "# lang1_sentences = [sent1, sent2, ...]\n",
+        "# lang2_sentences = [sent1, sent2, ...]\n",
+        "# lang1_sentences_tokenized = [[word1, word2, ...], [word1, word2, ...], ...]\n",
+        "# lang2_sentences_tokenized = [[word1, word2, ...], [word1, word2, ...], ...]\n",
+        "\n",
+        "\n",
+        "# [8 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Mg18ezdTRHqG"
+      },
+      "source": [
+        "**Question 1.1:** What preprocessing choices did you make and why? (3-5 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "cLjQTbejRHqG"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "prIqhFYyRHqG"
+      },
+      "source": [
+        "## 1.3: Basic Statistics (10 points)\n",
+        "\n",
+        "Calculate and display key statistics for both language corpora to understand their characteristics."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "yvSoUoATRHqG"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Calculate statistics for BOTH languages\n",
+        "#\n",
+        "# For each language (lang1_sentences and lang2_sentences):\n",
+        "# - Total character count\n",
+        "# - Special character/punctuation count\n",
+        "# - Character vocabulary size (unique characters)\n",
+        "# - Total word count\n",
+        "# - Word vocabulary size (unique words)\n",
+        "# - Sentence count\n",
+        "# - Average sentence length (in words)\n",
+        "#\n",
+        "# Example structure:\n",
+        "# lang1_total_characters = sum(len(sentence) for sentence in lang1_sentences)\n",
+        "# ...\n",
+        "# lang1_total_words = sum(len(sentence) for sentence in lang1_sentences_tokenized)\n",
+        "# lang1_word_vocabulary = len(set(word for sentence in lang1_sentences_tokenized for word in sentence))\n",
+        "# ...\n",
+        "#\n",
+        "# Print statistics side by side for the two corpora\n",
+        "\n",
+        "\n",
+        "# [6 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "n-PSkjPGRHqG"
+      },
+      "source": [
+        "**Question 1.2:** What are the key differences between your two corpora? (2-3 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "pS9Y_nWwRHqG"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "dMnhFykGRHqG"
+      },
+      "source": [
+        "---\n",
+        "\n",
+        "# Task 2: Character N-gram Language Identification (58 points)\n",
+        "\n",
+        "**Baseline (46 pts):** Implement character-based 2-gram and 3-gram models, run 10-fold CV, report accuracy.  \n",
+        "**Creativity (12 pts):** Out-of-vocabulary analysis."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ugQ7EB70RHqG"
+      },
+      "source": [
+        "## 2.1: Implement Character N-gram Models (12 points)\n",
+        "\n",
+        "Implement the `CharNgramLanguageModel` class with Laplace smoothing using NLTK's n-gram utilities. The model should count **character** n-grams during training and calculate sentence probabilities with smoothing.\n",
+        "\n",
+        "**Key difference from word n-grams:** Instead of tokenizing sentences into words, you'll work with individual characters in each sentence."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "tKiKoqstRHqG"
+      },
+      "outputs": [],
+      "source": [
+        "import nltk\n",
+        "from nltk.util import ngrams, pad_sequence\n",
+        "from nltk.lm import Laplace\n",
+        "from nltk.lm.preprocessing import padded_everygram_pipeline\n",
+        "from typing import List\n",
+        "\n",
+        "# Download required NLTK data\n",
+        "nltk.download('punkt', quiet=True)\n",
+        "\n",
+        "class CharNgramLanguageModel:\n",
+        "    \"\"\"\n",
+        "    Character-based N-gram language model with Laplace (add-1) smoothing using NLTK.\n",
+        "    \"\"\"\n",
+        "\n",
+        "    def __init__(self, n: int = 2):\n",
+        "        \"\"\"\n",
+        "        Initialize the character n-gram model.\n",
+        "\n",
+        "        Args:\n",
+        "            n: Order of n-gram (2 for bigram, 3 for trigram)\n",
+        "        \"\"\"\n",
+        "        self.n = n\n",
+        "        self.model = Laplace(n)\n",
+        "\n",
+        "    def train(self, sentences: List[str]):\n",
+        "        \"\"\"\n",
+        "        Train the model on a list of sentences.\n",
+        "\n",
+        "        Args:\n",
+        "            sentences: List of sentences (each sentence is a string)\n",
+        "        \"\"\"\n",
+        "        # TODO: Your code here\n",
+        "        # Convert each sentence to a list of characters\n",
+        "        # Example: \"hello\" -> ['h', 'e', 'l', 'l', 'o']\n",
+        "        # Use padded_everygram_pipeline to prepare training data with padding\n",
+        "        # Then fit the model using self.model.fit()\n",
+        "        pass\n",
+        "\n",
+        "    def get_probability(self, sentence: str) -> float:\n",
+        "        \"\"\"\n",
+        "        Calculate the probability of a sentence.\n",
+        "\n",
+        "        Args:\n",
+        "            sentence: Sentence string\n",
+        "\n",
+        "        Returns:\n",
+        "            Probability of the sentence\n",
+        "        \"\"\"\n",
+        "        # TODO: Your code here\n",
+        "        # Convert sentence to list of characters\n",
+        "        # Pad the character sequence and generate n-grams\n",
+        "        # For each n-gram, get probability using self.model.score()\n",
+        "        # Multiply probabilities together (or sum log probabilities to avoid underflow)\n",
+        "        pass\n",
+        "\n",
+        "# [8 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "LwxpPMNwRHqG"
+      },
+      "source": [
+        "### Spot Check: Inspect Your N-gram Models\n",
+        "\n",
+        "After implementing the model, train sample models on both languages and inspect what they learned."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "TT9Q6WH8RHqG"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Train sample models and inspect them\n",
+        "#\n",
+        "# 1. Create 2-gram and 3-gram models for both languages\n",
+        "# 2. Train them on your full datasets (lang1_sentences and lang2_sentences)\n",
+        "# 3. Inspect the models to see what n-grams they learned\n",
+        "#\n",
+        "# Example:\n",
+        "# model_2gram_lang1 = NgramLanguageModel(n=2)\n",
+        "# model_2gram_lang1.train(lang1_sentences)\n",
+        "# model_3gram_lang1 = NgramLanguageModel(n=3)\n",
+        "# model_3gram_lang1.train(lang1_sentences)\n",
+        "#\n",
+        "# model_2gram_lang2 = NgramLanguageModel(n=2)\n",
+        "# model_2gram_lang2.train(lang2_sentences)\n",
+        "# model_3gram_lang2 = NgramLanguageModel(n=3)\n",
+        "# model_3gram_lang2.train(lang3_sentences)\n",
+        "#\n",
+        "# Display sample n-grams and their counts from each model\n",
+        "# Check vocabulary size: len(model.model.vocab)\n",
+        "# Show most common n-grams or test probabilities on sample sentences\n",
+        "\n",
+        "# Your code here\n",
+        "\n",
+        "# [4 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "olw1RKdrRHqG"
+      },
+      "source": [
+        "## 2.2: Implement Language Identification (8 points)\n",
+        "\n",
+        "Create a function that compares sentence probabilities from two language models and returns the predicted label."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "ygVJnY5gRHqG"
+      },
+      "outputs": [],
+      "source": [
+        "def identify_language(sentence: str,\n",
+        "                     model_lang1: CharNgramLanguageModel,\n",
+        "                     model_lang2: CharNgramLanguageModel) -> int:\n",
+        "    \"\"\"\n",
+        "    Identify the language of a sentence using two character-based language models.\n",
+        "\n",
+        "    Args:\n",
+        "        sentence: Sentence string\n",
+        "        model_lang1: Language model for language 1 (label 0)\n",
+        "        model_lang2: Language model for language 2 (label 1)\n",
+        "\n",
+        "    Returns:\n",
+        "        Predicted label (0 or 1)\n",
+        "    \"\"\"\n",
+        "    # TODO: Your code here\n",
+        "    #\n",
+        "    # Steps:\n",
+        "    # 1. Calculate probability of sentence using model_lang1\n",
+        "    #    prob1 = model_lang1.get_probability(sentence)\n",
+        "    #\n",
+        "    # 2. Calculate probability of sentence using model_lang2\n",
+        "    #    prob2 = model_lang2.get_probability(sentence)\n",
+        "    #\n",
+        "    # 3. Compare probabilities and return the label of the model with higher probability\n",
+        "    #    if prob1 > prob2: return 0\n",
+        "    #    else: return 1\n",
+        "\n",
+        "    pass\n",
+        "\n",
+        "# [8 pts]\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "0v9cJXjQRHqG"
+      },
+      "source": [
+        "## 2.3: Implement Evaluation Function (6 points)\n",
+        "\n",
+        "Create a function that calculates accuracy, precision, recall, and F1-score given predicted and true labels."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "QsO4Rwz6RHqH"
+      },
+      "outputs": [],
+      "source": [
+        "def calculate_metrics(y_true: List[int], y_pred: List[int]) -> Dict[str, float]:\n",
+        "    \"\"\"\n",
+        "    Calculate evaluation metrics.\n",
+        "\n",
+        "    Args:\n",
+        "        y_true: True labels\n",
+        "        y_pred: Predicted labels\n",
+        "\n",
+        "    Returns:\n",
+        "        Dictionary with accuracy, precision, recall, f1_score\n",
+        "    \"\"\"\n",
+        "    # TODO: Your code here\n",
+        "    # Use sklearn's accuracy_score and precision_recall_fscore_support\n",
+        "    pass\n",
+        "\n",
+        "# [6 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "UEpUfSf2RHqH"
+      },
+      "source": [
+        "## 2.4: 10-Fold Cross-Validation for Language Identification (8 points)\n",
+        "\n",
+        "Implement 10-fold cross-validation to evaluate your character-based n-gram models. In each fold, split the data, train separate models for each language and n-gram order, make predictions, and evaluate performance."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "sqLvr7twRHqH"
+      },
+      "outputs": [],
+      "source": [
+        "from sklearn.model_selection import KFold\n",
+        "\n",
+        "# Prepare dataset: combine sentence STRINGS from both languages with labels\n",
+        "X = lang1_sentences_str + lang2_sentences_str\n",
+        "y = [0] * len(lang1_sentences_str) + [1] * len(lang2_sentences_str)\n",
+        "\n",
+        "print(f\"Dataset prepared:\")\n",
+        "print(f\"  Total sentences: {len(X)}\")\n",
+        "print(f\"  Language 1 (label 0): {sum(1 for label in y if label == 0)} sentences\")\n",
+        "print(f\"  Language 2 (label 1): {sum(1 for label in y if label == 1)} sentences\")\n",
+        "print()\n",
+        "\n",
+        "# Initialize 10-fold cross-validation\n",
+        "kfold = KFold(n_splits=10, shuffle=True, random_state=42)\n",
+        "\n",
+        "# Store results for each fold\n",
+        "results_2gram = {'accuracy': [], 'precision': [], 'recall': [], 'f1': []}\n",
+        "results_3gram = {'accuracy': [], 'precision': [], 'recall': [], 'f1': []}\n",
+        "\n",
+        "# TODO: Implement 10-fold cross-validation\n",
+        "#\n",
+        "# For each fold, you need to:\n",
+        "#   1. Split data into train and test sets using train_idx and test_idx from kfold.split(X)\n",
+        "#   2. Separate training sentences by language based on labels\n",
+        "#   3. Train FOUR models total:\n",
+        "#      - Two 2-gram models (one per language)\n",
+        "#      - Two 3-gram models (one per language)\n",
+        "#   4. Make predictions on test sentences using identify_language()\n",
+        "#   5. Calculate metrics using calculate_metrics()\n",
+        "#   6. Store results in results_2gram and results_3gram dictionaries\n",
+        "#\n",
+        "\n",
+        "for fold_idx, (train_idx, test_idx) in enumerate(kfold.split(X), 1):\n",
+        "    print(f\"\\n{'='*50}\")\n",
+        "    print(f\"Fold {fold_idx}/10\")\n",
+        "    print(f\"{'='*50}\")\n",
+        "\n",
+        "    # TODO Your implementation here\n",
+        "\n",
+        "print(\"\\n\" + \"=\"*50)\n",
+        "print(\"Cross-validation completed!\")\n",
+        "print(\"=\"*50)\n",
+        "\n",
+        "# [8 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "JlXE_SfFRHqH"
+      },
+      "source": [
+        "## 2.5: Display Results (12)\n",
+        "\n",
+        "*Create a table showing for each model:*\n",
+        "Mean accuracy, precision, recall, F1 (with std)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "cyBVJGxFRHqH"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Calculate and display summary statistics\n",
+        "#\n",
+        "#\n",
+        "# Example:\n",
+        "# results_df = pd.DataFrame({\n",
+        "#     'Model': ['2-gram', '3-gram'],\n",
+        "#     'Accuracy': [...],\n",
+        "#     'Precision': [...],\n",
+        "#     ...\n",
+        "# })\n",
+        "\n",
+        "# [4 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "o7XedIvGRHqH"
+      },
+      "source": [
+        "**Question 2.1:** Which of your trained models performed best on the validation data, and why? (3-4 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Iz1s_WlARHqH"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Ckv543M4RHqH"
+      },
+      "source": [
+        "**Question 2.2:** Were the results consistent across different folds of cross-validation? (2-3 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "vkbHF5HbRHqH"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "kk7uadeZRHqH"
+      },
+      "source": [
+        "## 2.6: Out-of-Vocabulary Testing (12 pts)\n",
+        "\n",
+        "Test your models with **five** sentences containing characters or character combinations not common in your training corpus. For character n-grams, this might include unusual letter combinations, foreign words, or made-up words that still follow language patterns."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "dj0QEDnARHqH"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Create and test OOV sentences\n",
+        "#\n",
+        "# - Be creative!\n",
+        "\n",
+        "# [8 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "iqrkgUOARHqH"
+      },
+      "source": [
+        "**Question 2.3:** How well did your models handle out-of-vocabulary (OOV) samples? (2-3 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "taFkBF3JRHqH"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "nz19fjohRHqH"
+      },
+      "source": [
+        "---\n",
+        "\n",
+        "# Task 3: Statistical Analysis (20 points)\n",
+        "\n",
+        "**Baseline (10 pts):** Statistical significance testing and comparison.  \n",
+        "**Creativity (10 pts):** Advanced analysis (confusion matrices, error analysis, etc.)."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "peCDCXqqRHqO"
+      },
+      "source": [
+        "## 3.1: Statistical Significance Testing (10 points)\n",
+        "\n",
+        "Use paired t-test to compare models. p-value < 0.05 indicates statistically significant difference."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "nNrEt4s5RHqO"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Perform paired t-tests\n",
+        "#\n",
+        "# Compare: 2-gram vs 3-gram\n",
+        "#\n",
+        "# Use: t_stat, p_value = ttest_rel(results_1, results_2)\n",
+        "\n",
+        "# [6 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "20soxRd6RHqO"
+      },
+      "source": [
+        "**Question 3.1:** Are the performance differences statistically significant? Explain what 'statistical significance' means in this context. (2-3 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "48KiLvz4RHqP"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "_lms2PaRRHqP"
+      },
+      "source": [
+        "## 3.2: Advanced Analysis (10 points)\n",
+        "\n",
+        "Perform deeper analysis such as per-language performance, misclassification patterns, etc."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "SvOfyE8ORHqP"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: Your advanced analysis here\n",
+        "\n",
+        "# [6 pts]"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "iQxhIhmMRHqP"
+      },
+      "source": [
+        "**Question 3.2:** What interesting patterns or insights did you discover from your results? (4-5 sentences)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "6tj2BkoiRHqP"
+      },
+      "source": [
+        "**[YOUR ANSWER HERE]**"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "lLhYIeKiG01-"
+      },
+      "source": [
+        "# Convert Your Colab Notebook to PDF\n",
+        "\n",
+        "### Step 1: Download Your Notebook\n",
+        "- Go to **File → Download → Download .ipynb**\n",
+        "- Save the file to your computer\n",
+        "\n",
+        "### Step 2: Upload to Colab\n",
+        "- Click the **📁 folder icon** on the left sidebar\n",
+        "- Click the **upload button**\n",
+        "- Select your downloaded .ipynb file\n",
+        "\n",
+        "### Step 3: Run the Code Below\n",
+        "- **Uncomment the cell below** and run the cell\n",
+        "- This will take about 1-2 minutes to install required packages\n",
+        "- When prompted, type your notebook name (e.g.`gs_000000_as2.ipynb`) and press Enter\n",
+        "\n",
+        "### The PDF will be automatically downloaded to your computer\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "zDPvhmqPMCSg"
+      },
+      "outputs": [],
+      "source": [
+        "# # Install required packages (this takes about 30 seconds)\n",
+        "# print(\"Installing PDF converter... please wait...\")\n",
+        "# !apt-get update -qq\n",
+        "# !apt-get install -y texlive-xetex texlive-fonts-recommended texlive-plain-generic pandoc > /dev/null 2>&1\n",
+        "# !pip install -q nbconvert\n",
+        "\n",
+        "# print(\"\\n\" + \"=\"*50)\n",
+        "\n",
+        "# # Get notebook name from user\n",
+        "# notebook_name = input(\"\\nEnter your notebook name: \")\n",
+        "\n",
+        "# # Add .ipynb if missing\n",
+        "# if not notebook_name.endswith('.ipynb'):\n",
+        "#     notebook_name += '.ipynb'\n",
+        "\n",
+        "# import os\n",
+        "# notebook_path = f'/content/{notebook_name}'\n",
+        "\n",
+        "# # Check if file exists\n",
+        "# if not os.path.exists(notebook_path):\n",
+        "#     print(f\"\\n⚠ Error: '{notebook_name}' not found in /content/\")\n",
+        "#     print(\"\\nMake sure you uploaded the file using the folder icon (📁) on the left!\")\n",
+        "# else:\n",
+        "#     print(f\"\\n✓ Found {notebook_name}\")\n",
+        "#     print(\"Converting to PDF... this may take 1-2 minutes...\\n\")\n",
+        "\n",
+        "#     # Convert the notebook to PDF\n",
+        "#     !jupyter nbconvert --to pdf \"{notebook_path}\"\n",
+        "\n",
+        "#     # Download the PDF\n",
+        "#     from google.colab import files\n",
+        "#     pdf_name = notebook_name.replace('.ipynb', '.pdf')\n",
+        "#     pdf_path = f'/content/{pdf_name}'\n",
+        "\n",
+        "#     if os.path.exists(pdf_path):\n",
+        "#         print(\"✓ SUCCESS! Downloading your PDF now...\")\n",
+        "#         files.download(pdf_path)\n",
+        "#         print(\"\\n✓ Done! Check your downloads folder.\")\n",
+        "#     else:\n",
+        "#         print(\"⚠ Error: Could not create PDF\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "provenance": []
+    },
+    "kernelspec": {
+      "display_name": "base",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.12.9"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
